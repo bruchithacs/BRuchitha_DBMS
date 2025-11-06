@@ -1,0 +1,200 @@
+create database Employee_Database;
+use Employee_Database;
+
+CREATE TABLE DEPT (
+    DEPTNO INT PRIMARY KEY,
+    DNAME VARCHAR(50),
+    DLOC VARCHAR(50)
+);
+desc DEPT;
+
+CREATE TABLE EMPLOYEE (
+    EMPNO INT PRIMARY KEY,
+    ENAME VARCHAR(50),
+    MGR_NO INT,
+    HIREDATE DATE,
+    SAL DECIMAL(10,2),
+    DEPTNO INT,
+    FOREIGN KEY (DEPTNO) REFERENCES DEPT(DEPTNO)
+);
+desc EMPLOYEE;
+
+CREATE TABLE PROJECT (
+    PNO INT PRIMARY KEY,
+    PLOC VARCHAR(50),
+    PNAME VARCHAR(50)
+);
+desc PROJECT;
+
+CREATE TABLE ASSIGNED_TO (
+    EMPNO INT,
+    PNO INT,
+    JOB_ROLE VARCHAR(50),
+    PRIMARY KEY (EMPNO, PNO),
+    FOREIGN KEY (EMPNO) REFERENCES EMPLOYEE(EMPNO),
+    FOREIGN KEY (PNO) REFERENCES PROJECT(PNO)
+);
+desc ASSIGNED_TO;
+
+CREATE TABLE INCENTIVES (
+    EMPNO INT,
+    INCENTIVE_DATE DATE,
+    INCENTIVE_AMOUNT DECIMAL(10,2),
+    FOREIGN KEY (EMPNO) REFERENCES EMPLOYEE(EMPNO)
+);
+DESC INCENTIVES;
+
+
+-- DEPT
+INSERT INTO DEPT VALUES
+(10, 'IT', 'Bengaluru'),
+(20, 'HR', 'Hyderabad'),
+(30, 'Finance', 'Mysuru'),
+(40, 'Marketing', 'Chennai'),
+(50, 'Sales', 'Pune');
+
+SELECT*FROM DEPT;
+
+-- EMPLOYEE
+INSERT INTO EMPLOYEE VALUES
+(101, 'Ravi', NULL, '2020-05-10', 60000, 10),
+(102, 'Anita', 101, '2019-03-15', 55000, 20),
+(103, 'Kiran', 101, '2021-01-12', 50000, 30),
+(104, 'Meena', 102, '2018-07-25', 65000, 40),
+(105, 'Suresh', 103, '2022-02-14', 48000, 10),
+(106, 'Priya', 103, '2023-06-18', 52000, 20);
+
+SELECT*FROM EMPLOYEE;
+
+UPDATE EMPLOYEE
+SET DEPTNO = 20
+WHERE EMPNO = 104;
+
+
+-- PROJECT
+INSERT INTO PROJECT VALUES
+(1, 'Bengaluru', 'SmartApp'),
+(2, 'Hyderabad', 'DataSecure'),
+(3, 'Mysuru', 'PaySys'),
+(4, 'Pune', 'AdBoost'),
+(5, 'Chennai', 'CloudX');
+SELECT*FROM PROJECT;
+
+
+-- ASSIGNED_TO
+INSERT INTO ASSIGNED_TO VALUES
+(101, 1, 'Manager'),
+(102, 2, 'HR Specialist'),
+(103, 3, 'Analyst'),
+(104, 5, 'Marketing Lead'),
+(105, 1, 'Developer'),
+(106, 2, 'Coordinator');
+SELECT*FROM ASSIGNED_TO;
+
+
+-- INCENTIVES
+INSERT INTO INCENTIVES VALUES
+(101, '2024-03-01', 5000),
+(103, '2024-05-20', 3000),
+(104, '2024-06-15', 2500);
+INSERT INTO INCENTIVES VALUES
+(101, '2019-01-10', 4000),
+(102, '2019-01-12', 2500),
+(103, '2019-01-15', 3500),
+(104, '2019-01-20', 3000),
+(105, '2019-01-25', 4500);
+
+SELECT*FROM INCENTIVES;
+
+
+
+
+/*Retrieve Employee Numbers of All Employees Working on Projects Located in Bengaluru, Hyderabad, or Mysuru*/
+SELECT DISTINCT A.EMPNO
+FROM ASSIGNED_TO A
+JOIN PROJECT P ON A.PNO = P.PNO
+WHERE P.PLOC IN ('Bengaluru', 'Hyderabad', 'Mysuru');
+
+
+
+/*Get Employee IDs of Those Employees Who Didn’t Receive Incentives*/
+SELECT E.EMPNO
+FROM EMPLOYEE E
+WHERE E.EMPNO NOT IN (SELECT EMPNO FROM INCENTIVES);
+
+
+/*Find Employee Name, Number, Dept, Job Role, Department Location, and Project Location for Employees Working in Projects Located Same as Their Department Location*/
+SELECT E.ENAME, E.EMPNO, D.DNAME, A.JOB_ROLE, D.DLOC AS DEPT_LOCATION, P.PLOC AS PROJECT_LOCATION
+FROM EMPLOYEE E
+JOIN DEPT D ON E.DEPTNO = D.DEPTNO
+JOIN ASSIGNED_TO A ON E.EMPNO = A.EMPNO
+JOIN PROJECT P ON A.PNO = P.PNO
+WHERE D.DLOC = P.PLOC;
+
+
+/*List the Name of the Managers with Maximum Employees*/
+SELECT E.ENAME AS Manager_Name
+FROM EMPLOYEE E
+JOIN EMPLOYEE M ON E.EMPNO = M.MGR_NO
+GROUP BY E.ENAME
+HAVING COUNT(M.EMPNO) = (
+    SELECT MAX(COUNT_SUB)
+    FROM (
+        SELECT COUNT(MGR_NO) AS COUNT_SUB
+        FROM EMPLOYEE
+        WHERE MGR_NO IS NOT NULL
+        GROUP BY MGR_NO
+    ) AS CNT
+);
+
+
+
+
+
+/*Display Managers Whose Salary > Average Salary of Their Employees*/
+
+SELECT DISTINCT M.ENAME AS Manager_Name
+FROM EMPLOYEE M
+JOIN EMPLOYEE E ON M.EMPNO = E.MGR_NO
+GROUP BY M.EMPNO, M.ENAME, M.SAL
+HAVING M.SAL > AVG(E.SAL);
+
+
+
+/* Employee Details Who Got Second Maximum Incentive in Jan 2019*/
+
+SELECT E.*
+FROM EMPLOYEE E
+JOIN INCENTIVES I ON E.EMPNO = I.EMPNO
+WHERE I.INCENTIVE_DATE BETWEEN '2019-01-01' AND '2019-01-31'
+AND I.INCENTIVE_AMOUNT = (
+    SELECT MAX(INCENTIVE_AMOUNT)
+    FROM INCENTIVES
+    WHERE INCENTIVE_DATE BETWEEN '2019-01-01' AND '2019-01-31'
+      AND INCENTIVE_AMOUNT < (
+          SELECT MAX(INCENTIVE_AMOUNT)
+          FROM INCENTIVES
+          WHERE INCENTIVE_DATE BETWEEN '2019-01-01' AND '2019-01-31'
+      )
+);
+
+
+/*Employees Working in the Same Department as Their Manager*/
+
+SELECT E.ENAME AS Employee_Name, M.ENAME AS Manager_Name, D.DNAME AS Department
+FROM EMPLOYEE E                                    
+JOIN EMPLOYEE M ON E.MGR_NO = M.EMPNO
+JOIN DEPT D ON E.DEPTNO = D.DEPTNO
+WHERE E.DEPTNO = M.DEPTNO;
+
+
+/*Find the name of the second top-level managers of each department*/
+
+SELECT E.ENAME AS Second_Level_Manager, D.DNAME AS Department
+FROM EMPLOYEE E
+JOIN EMPLOYEE M ON E.MGR_NO = M.EMPNO
+JOIN DEPT D ON E.DEPTNO = D.DEPTNO
+WHERE M.MGR_NO IS NULL;
+
+
+
